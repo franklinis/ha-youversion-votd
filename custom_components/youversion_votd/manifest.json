@@ -1,6 +1,6 @@
 {
   "domain": "youversion_votd",
-  "name": "YouVersion Verse of the Day",
+  "name": "YouVersion Bible Verse of the Day",
   "codeowners": ["@franklinis"],
   "config_flow": true,
   "documentation": "https://github.com/franklinis/ha-youversion-votd",
@@ -8,5 +8,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/franklinis/ha-youversion-votd/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

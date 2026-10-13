@@ -1,4 +1,4 @@
-# YouVersion Verse of the Day for Home Assistant
+# YouVersion Bible Verse of the Day for Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
 [![Validate](https://github.com/franklinis/ha-youversion-votd/actions/workflows/validate.yml/badge.svg)](https://github.com/franklinis/ha-youversion-votd/actions/workflows/validate.yml)
@@ -53,7 +53,7 @@ Copy `custom_components/youversion_votd` into your Home Assistant `config/custom
 
 [![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=youversion_votd)
 
-1. Click the button above, or go to **Settings → Devices & services → Add integration** and choose **YouVersion Verse of the Day**.
+1. Click the button above, or go to **Settings → Devices & services → Add integration** and choose **YouVersion Bible Verse of the Day**.
 2. Paste your app key. The language defaults to your Home Assistant language; it only filters the list of Bible versions.
 3. Pick a Bible version.
 

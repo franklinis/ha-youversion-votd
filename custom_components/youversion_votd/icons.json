@@ -1,0 +1,9 @@
+{
+  "entity": {
+    "sensor": {
+      "verse_of_the_day": {
+        "default": "mdi:book-cross"
+      }
+    }
+  }
+}

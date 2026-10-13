@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to YouVersion",
+        "description": "Create a free app key at {platform_url}, then paste it below.",
+        "data": {
+          "app_key": "App key",
+          "language": "Language"
+        },
+        "data_description": {
+          "app_key": "The app key from your YouVersion Platform app.",
+          "language": "Language code used to list Bible versions, such as en, es or pt-BR."
+        }
+      },
+      "bible": {
+        "title": "Choose a Bible version",
+        "data": {
+          "bible_id": "Bible version"
+        },
+        "data_description": {
+          "bible_id": "Only versions your app key is licensed to read are listed."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update your YouVersion app key",
+        "description": "YouVersion rejected the saved app key. Enter a new one from {platform_url}.",
+        "data": {
+          "app_key": "App key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "YouVersion rejected this app key.",
+      "cannot_connect": "Could not reach the YouVersion API.",
+      "no_bibles": "This app key has no Bible versions in that language.",
+      "bible_unavailable": "This app key cannot read the configured Bible version.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Bible version is already set up.",
+      "reauth_successful": "The app key was updated."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "verse_of_the_day": {
+        "name": "Verse of the day",
+        "state_attributes": {
+          "text": { "name": "Text" },
+          "reference": { "name": "Reference" },
+          "passage_id": { "name": "Passage ID" },
+          "version": { "name": "Version" },
+          "version_name": { "name": "Version name" },
+          "bible_id": { "name": "Bible ID" },
+          "copyright": { "name": "Copyright" },
+          "day_of_year": { "name": "Day of year" },
+          "date": { "name": "Date" },
+          "url": { "name": "URL" }
+        }
+      }
+    }
+  }
+}

@@ -24,8 +24,6 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # Custom integrations are not in home-assistant/brands until submitted there.
-          ignore: brands
 
   tests:
     runs-on: ubuntu-latest

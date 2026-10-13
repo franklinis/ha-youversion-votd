@@ -38,9 +38,12 @@ Which Bible versions you can choose depends on the licenses attached to your app
 
 ### HACS (recommended)
 
-1. In HACS, open the menu (⋮) → **Custom repositories**.
-2. Add `https://github.com/franklinis/ha-youversion-votd` with type **Integration**.
-3. Search for **YouVersion Verse of the Day**, download it, and restart Home Assistant.
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=franklinis&repository=ha-youversion-votd&category=integration)
+
+1. Click the button above. It opens HACS on your Home Assistant with this repository ready to add.
+2. Select **Download**, then restart Home Assistant.
+
+Or add it by hand: in HACS open the menu (⋮) → **Custom repositories**, add `https://github.com/franklinis/ha-youversion-votd` with type **Integration**, then download it.
 
 ### Manual
 
@@ -48,7 +51,9 @@ Copy `custom_components/youversion_votd` into your Home Assistant `config/custom
 
 ## Setup
 
-1. Go to **Settings → Devices & services → Add integration** and choose **YouVersion Verse of the Day**.
+[![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=youversion_votd)
+
+1. Click the button above, or go to **Settings → Devices & services → Add integration** and choose **YouVersion Verse of the Day**.
 2. Paste your app key. The language defaults to your Home Assistant language; it only filters the list of Bible versions.
 3. Pick a Bible version.
 

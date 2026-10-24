@@ -1,38 +1,33 @@
-# YouVersion Bible Verse of the Day for Home Assistant
+# Bible Verse of the Day for Home Assistant
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz)
 [![Validate](https://github.com/franklinis/ha-youversion-votd/actions/workflows/validate.yml/badge.svg)](https://github.com/franklinis/ha-youversion-votd/actions/workflows/validate.yml)
 
-A Home Assistant integration that shows the [YouVersion](https://www.bible.com/verse-of-the-day) Verse of the Day in the Bible version you choose. Put it on a dashboard, read it aloud with TTS, or send it to your phone each morning.
+A Home Assistant integration that shows a Bible verse of the day **in the language and Bible translation you choose**. Put it on a dashboard, read it aloud with TTS, or send it to your phone each morning.
 
-It uses the official [YouVersion Platform API](https://developers.youversion.com), not page scraping.
+**No account or key needed.**
+- **The day's verse** is picked by [DailyVerses.net](https://dailyverses.net) and read through its official website widget.
+- **The text** comes from the [Free Use Bible API](https://bible.helloao.org). It offers about 1,250 public-domain and openly licensed translations in about 1,000 languages: for example the Berean Standard Bible, the World English Bible, Lutherbibel 1912, Reina-Valera, Louis Segond, and the Indian Revised Version in Tamil, Hindi, Malayalam, Telugu and Kannada.
 
-> This is a community project. It is not affiliated with or endorsed by YouVersion or Life.Church.
+> This is a community project, not affiliated with DailyVerses.net or the Free Use Bible API. Versions up to 0.1.x used YouVersion and needed an app key; the repository and domain keep that original name so existing installs keep working.
 
 ## What you get
 
-One sensor per Bible version you add, for example `sensor.youversion_bsb_verse_of_the_day`:
+One sensor per translation you add, for example `sensor.bible_bsb_verse_of_the_day`:
 
 | | Example |
 |---|---|
-| **State** | `Philippians 4:6-7` |
-| `text` | `Be anxious for nothing, but in everything, by prayer and petition…` |
-| `reference` | `Philippians 4:6-7` |
-| `version` | `BSB` |
-| `version_name` | `Berean Standard Bible` |
-| `copyright` | The publisher's copyright notice for the version |
-| `url` | `https://www.bible.com/bible/3034/PHP.4.6-7` |
-| `passage_id` | `PHP.4.6-7` (USFM) |
-| `bible_id`, `day_of_year`, `date` | `3034`, `286`, `2026-10-13` |
+| **State** | `Isaiah 25:1` (in the translation's language, e.g. `Jesaja 25,1`, `ஏசாயா 25:1`) |
+| `text` | `O LORD, You are my God! I will exalt You; I will praise Your name…` |
+| `reference_en` | `Isaiah 25:1` |
+| `passage_id` | `ISA.25.1` (USFM) |
+| `translation`, `translation_name` | `BSB`, `Berean Standard Bible` |
+| `language` | `eng` (ISO 639-3) |
+| `license` | Link to the translation's license |
+| `fallback` | `true` if the chosen translation lacks the verse and the BSB is shown instead |
+| `date`, `url` | `2026-10-24`, the verse on DailyVerses.net |
 
 The verse text is an attribute, not the state, because Home Assistant limits states to 255 characters and some verses are longer.
-
-## Before you install: get a free app key
-
-1. Sign in at [platform.youversion.com](https://platform.youversion.com) and create an app.
-2. Copy its **app key**.
-
-Which Bible versions you can choose depends on the licenses attached to your app. The license-free Berean Standard Bible (BSB), which YouVersion's own SDKs use by default, is preselected when your key can read it.
 
 ## Installation
 
@@ -40,10 +35,7 @@ Which Bible versions you can choose depends on the licenses attached to your app
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=franklinis&repository=ha-youversion-votd&category=integration)
 
-1. Click the button above. It opens HACS on your Home Assistant with this repository ready to add.
-2. Select **Download**, then restart Home Assistant.
-
-Or add it by hand: in HACS open the menu (⋮) → **Custom repositories**, add `https://github.com/franklinis/ha-youversion-votd` with type **Integration**, then download it.
+Search HACS for **Bible Verse of the Day** (or click the button above), select **Download**, then restart Home Assistant.
 
 ### Manual
 
@@ -53,11 +45,11 @@ Copy `custom_components/youversion_votd` into your Home Assistant `config/custom
 
 [![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=youversion_votd)
 
-1. Click the button above, or go to **Settings → Devices & services → Add integration** and choose **YouVersion Bible Verse of the Day**.
-2. Paste your app key. The language defaults to your Home Assistant language; it only filters the list of Bible versions.
-3. Pick a Bible version.
+1. Click the button above, or go to **Settings → Devices & services → Add integration** and choose **Bible Verse of the Day**.
+2. Choose a language. It starts on your Home Assistant language.
+3. Choose a translation. Complete Bibles are listed first.
 
-Add the integration again to follow more than one version.
+To change the language or translation later, open the integration and choose **Reconfigure**. Add the integration again to follow several translations at once, for example Tamil and English.
 
 ## Examples
 
@@ -66,12 +58,12 @@ Add the integration again to follow more than one version.
 ```yaml
 type: markdown
 content: |
-  {% set v = 'sensor.youversion_bsb_verse_of_the_day' %}
-  ## {{ states(v) }} <small>{{ state_attr(v, 'version') }}</small>
+  {% set v = 'sensor.bible_bsb_verse_of_the_day' %}
+  ## {{ states(v) }} <small>{{ state_attr(v, 'translation') }}</small>
 
   {{ state_attr(v, 'text') }}
 
-  <sub>{{ state_attr(v, 'copyright') }} · [Read on Bible.com]({{ state_attr(v, 'url') }})</sub>
+  <sub>{{ state_attr(v, 'translation_name') }} · Verse selection: [DailyVerses.net]({{ state_attr(v, 'url') }})</sub>
 ```
 
 ### Morning notification
@@ -84,8 +76,8 @@ triggers:
 actions:
   - action: notify.mobile_app_your_phone
     data:
-      title: "{{ states('sensor.youversion_bsb_verse_of_the_day') }}"
-      message: "{{ state_attr('sensor.youversion_bsb_verse_of_the_day', 'text') }}"
+      title: "{{ states('sensor.bible_bsb_verse_of_the_day') }}"
+      message: "{{ state_attr('sensor.bible_bsb_verse_of_the_day', 'text') }}"
 ```
 
 ### Read it aloud
@@ -97,20 +89,30 @@ target:
 data:
   media_player_entity_id: media_player.kitchen
   message: >-
-    {{ states('sensor.youversion_bsb_verse_of_the_day') }}.
-    {{ state_attr('sensor.youversion_bsb_verse_of_the_day', 'text') }}
+    {{ states('sensor.bible_bsb_verse_of_the_day') }}.
+    {{ state_attr('sensor.bible_bsb_verse_of_the_day', 'text') }}
 ```
 
 ## How it works
 
-- The verse follows YouVersion's 366-day calendar. The day is counted in your Home Assistant time zone, so the verse changes at your local midnight.
-- Each day the integration makes two API calls: one for the day's passage and one for its text. Version details are fetched once at startup. If a call fails it retries hourly, and the sensor is unavailable rather than showing yesterday's verse.
-- Your app key is sent only to `api.youversion.com`, and it is redacted from diagnostics.
-- If YouVersion rejects the key, Home Assistant asks you for a new one.
+- **When it checks:** once a day, just after your local midnight. DailyVerses.net follows European time, so if it hasn't moved to the new day yet, the integration asks again hourly until it does.
+- **What it fetches:** the day's reference (a few hundred bytes) and, when it changes, one chapter of your translation. The list of book names is fetched once at startup; the full list of translations is only fetched while you're choosing one.
+- **Verse numbering:** all translations use the same numbering, so the reference from DailyVerses.net works with every translation.
+- **Missing verses:** if a translation doesn't include the day's book (for example a New Testament only translation), the verse is shown in the Berean Standard Bible and `fallback` is `true`.
+- **Errors:** if a request fails, the integration retries hourly. On a new day the sensor shows as unavailable rather than keeping yesterday's verse.
+
+## Upgrading from 0.1.x (YouVersion)
+
+Existing entries move over automatically:
+- **The app key** is removed.
+- **The translation** becomes the preferred free one in your old language, falling back to the BSB.
+- **The sensor** keeps its entity ID.
+
+Use **Reconfigure** to pick a different translation.
 
 ## Attribution
 
-Scripture text is copyrighted by each version's publisher. The sensor's `copyright` attribute and Home Assistant's attribution field carry the publisher's notice; please show it wherever you display the text, as the examples above do.
+Show the translation's name wherever you display the text, and credit DailyVerses.net for the selection, as the dashboard example does. Each translation's license is linked in the `license` attribute; most are public domain, some are Creative Commons with attribution.
 
 ## Development
 
@@ -123,4 +125,4 @@ python3.14 -m venv .venv
 
 ## License
 
-The code is [MIT licensed](LICENSE). Bible text belongs to its publishers.
+The code is [MIT licensed](LICENSE). Bible texts belong to their translators and are used under their licenses.

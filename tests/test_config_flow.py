@@ -1,115 +1,71 @@
-"""Tests for the config flow."""
+"""Tests for the config and reconfigure flows."""
 
 from __future__ import annotations
 
 from aiohttp import ClientError
-import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.youversion_votd.const import (
-    API_BASE_URL,
-    CONF_APP_KEY,
-    CONF_BIBLE_ID,
-    CONF_LANGUAGE,
-    DOMAIN,
-)
+from custom_components.youversion_votd.const import BIBLE_API_URL, DOMAIN
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from .conftest import APP_KEY, BIBLE_ID, BSB, KJV
+from .conftest import entry_data
 
-BIBLES_URL = f"{API_BASE_URL}/v1/bibles"
+
+def _default(result: dict, field: str) -> str:
+    """The value a form field starts with."""
+    return next(k for k in result["data_schema"].schema if str(k) == field).default()
+
+
+async def _start(hass: HomeAssistant) -> dict:
+    return await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
 
 
 async def test_full_flow(hass: HomeAssistant, mock_api: AiohttpClientMocker) -> None:
-    """App key, then Bible picker, creates an entry."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
+    """Pick a language, then a translation; no key is asked for."""
+    hass.config.language = "de"
+    result = await _start(hass)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
+    assert (
+        _default(result, "language") == "deu"
+    )  # suggested from Home Assistant's language
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: f" {APP_KEY} ", CONF_LANGUAGE: "en"}
+        result["flow_id"], {"language": "deu"}
     )
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "bible"
-    # The BSB is preselected when the key can read it.
-    schema_default = next(
-        key.default() for key in result["data_schema"].schema if key == CONF_BIBLE_ID
-    )
-    assert schema_default == str(BIBLE_ID)
+    assert result["step_id"] == "translation"
+    assert _default(result, "translation") == "deu_l12"
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_BIBLE_ID: str(BIBLE_ID)}
+        result["flow_id"], {"translation": "deu_l12"}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "YouVersion BSB"
-    assert result["data"] == {
-        CONF_APP_KEY: APP_KEY,
-        CONF_BIBLE_ID: BIBLE_ID,
-        CONF_LANGUAGE: "en",
-    }
-    assert result["result"].unique_id == str(BIBLE_ID)
+    assert result["title"] == "Bible L12"
+    assert result["data"] == entry_data("deu_l12")
+    assert result["result"].unique_id == "deu_l12"
 
 
-async def test_bibles_are_paginated(
+async def test_unknown_ha_language_suggests_english(
+    hass: HomeAssistant, mock_api: AiohttpClientMocker
+) -> None:
+    hass.config.language = "eo"
+    result = await _start(hass)
+    assert _default(result, "language") == "eng"
+
+
+async def test_cannot_connect(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """Every page of /v1/bibles is offered in the picker."""
     aioclient_mock.get(
-        BIBLES_URL,
-        params={"page_token": "next"},
-        json={"data": [BSB], "next_page_token": None},
+        f"{BIBLE_API_URL}/available_translations.json", exc=ClientError()
     )
-    aioclient_mock.get(BIBLES_URL, json={"data": [KJV], "next_page_token": "next"})
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: APP_KEY, CONF_LANGUAGE: "en"}
-    )
-    assert result["step_id"] == "bible"
-    selector = result["data_schema"].schema[CONF_BIBLE_ID]
-    assert [option["value"] for option in selector.config["options"]] == ["3034", "1"]
-
-
-@pytest.mark.parametrize(
-    ("mock_kwargs", "error"),
-    [
-        ({"status": 401}, {"base": "invalid_auth"}),
-        ({"status": 500}, {"base": "cannot_connect"}),
-        ({"exc": ClientError()}, {"base": "cannot_connect"}),
-        ({"json": {"data": [], "next_page_token": None}}, {CONF_LANGUAGE: "no_bibles"}),
-    ],
-)
-async def test_user_step_errors(
-    hass: HomeAssistant,
-    aioclient_mock: AiohttpClientMocker,
-    mock_kwargs: dict,
-    error: dict[str, str],
-) -> None:
-    """Errors are shown on the form, and the user can recover."""
-    aioclient_mock.get(BIBLES_URL, **mock_kwargs)
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: APP_KEY, CONF_LANGUAGE: "en"}
-    )
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user"
-    assert result["errors"] == error
-
-    aioclient_mock.clear_requests()
-    aioclient_mock.get(BIBLES_URL, json={"data": [BSB], "next_page_token": None})
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: APP_KEY, CONF_LANGUAGE: "en"}
-    )
-    assert result["step_id"] == "bible"
+    result = await _start(hass)
+    assert result["errors"] == {"base": "cannot_connect"}
 
 
 async def test_already_configured(
@@ -117,49 +73,56 @@ async def test_already_configured(
     mock_api: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """The same Bible version cannot be added twice."""
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"language": "eng"}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: APP_KEY, CONF_LANGUAGE: "en"}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_BIBLE_ID: str(BIBLE_ID)}
+        result["flow_id"], {"translation": "BSB"}
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
 
 
-async def test_reauth(
+async def test_reconfigure(
     hass: HomeAssistant,
-    aioclient_mock: AiohttpClientMocker,
+    mock_api: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """A rejected key can be replaced; a bad replacement shows an error first."""
+    """Change the language and translation later."""
     mock_config_entry.add_to_hass(hass)
-    result = await mock_config_entry.start_reauth_flow(hass)
-    assert result["step_id"] == "reauth_confirm"
-
-    aioclient_mock.get(f"{BIBLES_URL}/{BIBLE_ID}", status=401)
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    assert _default(result, "language") == "eng"
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: "still-bad"}
+        result["flow_id"], {"language": "tam"}
     )
-    assert result["errors"] == {"base": "invalid_auth"}
-
-    aioclient_mock.clear_requests()
-    aioclient_mock.get(f"{BIBLES_URL}/{BIBLE_ID}", status=404)
+    assert _default(result, "translation") == "tam_irv"
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: "wrong-license"}
-    )
-    assert result["errors"] == {"base": "bible_unavailable"}
-
-    aioclient_mock.clear_requests()
-    aioclient_mock.get(f"{BIBLES_URL}/{BIBLE_ID}", json=BSB)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_APP_KEY: "new-key"}
+        result["flow_id"], {"translation": "tam_irv"}
     )
     assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "reauth_successful"
-    assert mock_config_entry.data[CONF_APP_KEY] == "new-key"
+    assert result["reason"] == "reconfigure_successful"
+    assert mock_config_entry.data == entry_data("tam_irv")
+    assert mock_config_entry.unique_id == "tam_irv"
+    assert mock_config_entry.title == "Bible IRV"
+
+
+async def test_reconfigure_to_a_translation_set_up_elsewhere(
+    hass: HomeAssistant,
+    mock_api: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    MockConfigEntry(
+        domain=DOMAIN, unique_id="deu_l12", version=2, data=entry_data("deu_l12")
+    ).add_to_hass(hass)
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"language": "deu"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"translation": "deu_l12"}
+    )
+    assert result["reason"] == "already_configured"
+    assert mock_config_entry.unique_id == "BSB"

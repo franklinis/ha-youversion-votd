@@ -1,72 +1,86 @@
-"""Tests for the YouVersion API client."""
+"""Tests for parsing DailyVerses.net and the Free Use Bible API (no network)."""
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.youversion_votd.api import (
-    Bible,
-    YouVersionClient,
-    YouVersionError,
-    YouVersionNotFoundError,
+    BibleError,
+    BibleNotFoundError,
+    Translation,
+    parse_reference,
+    parse_widget,
+    verse_text,
 )
-from custom_components.youversion_votd.const import API_BASE_URL
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from custom_components.youversion_votd.translations_list import (
+    default_translation,
+    for_language,
+    languages,
+)
 
-from .conftest import KJV
-
-
-@pytest.fixture
-async def client(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> YouVersionClient:
-    """A client using the mocked session."""
-    return YouVersionClient(async_get_clientsession(hass), "key")
+from .conftest import BSB_PHP_4, TRANSLATIONS, WIDGET
 
 
-@pytest.mark.parametrize("day", [0, 367])
-async def test_day_out_of_range(client: YouVersionClient, day: int) -> None:
-    """Days outside 1-366 are rejected before any request."""
-    with pytest.raises(ValueError):
-        await client.get_verse_of_the_day(day)
+def test_parse_widget() -> None:
+    verse = parse_widget(WIDGET)
+    assert verse.date == date(2026, 10, 13)
+    assert verse.reference == "Philippians 4:6-7"
+    assert verse.passage_id == "PHP.4.6-7"
+    assert verse.url == "https://dailyverses.net/2026/10/13"
+
+
+def test_parse_widget_layout_change() -> None:
+    with pytest.raises(BibleError, match="no verse"):
+        parse_widget("document.write('hello')")
+    with pytest.raises(BibleError, match="no reference"):
+        parse_widget("x.innerHTML = '<div>text</div>';")
 
 
 @pytest.mark.parametrize(
-    ("mock_kwargs", "error"),
+    ("reference", "expected"),
     [
-        ({"text": "not json"}, YouVersionError),
-        ({"json": ["not", "an", "object"]}, YouVersionError),
-        ({"json": {"day": 1}}, YouVersionError),
-        ({"status": 404}, YouVersionNotFoundError),
+        ("John 3:16", ("JHN", 3, 16, 16)),
+        ("Psalm 23:1-2", ("PSA", 23, 1, 2)),
+        ("1 Corinthians 13:4\u20137", ("1CO", 13, 4, 7)),
+        ("Song of Songs 8:7", ("SNG", 8, 7, 7)),
     ],
 )
-async def test_bad_verse_of_the_day_response(
-    client: YouVersionClient,
-    aioclient_mock: AiohttpClientMocker,
-    mock_kwargs: dict,
-    error: type[Exception],
-) -> None:
-    """Malformed or missing responses raise a typed error."""
-    aioclient_mock.get(f"{API_BASE_URL}/v1/verse_of_the_days/1", **mock_kwargs)
-    with pytest.raises(error):
-        await client.get_verse_of_the_day(1)
+def test_parse_reference(reference: str, expected: tuple) -> None:
+    assert parse_reference(reference) == expected
 
 
-async def test_passage_missing_fields(
-    client: YouVersionClient, aioclient_mock: AiohttpClientMocker
-) -> None:
-    """A passage without content raises a typed error."""
-    aioclient_mock.get(
-        f"{API_BASE_URL}/v1/bibles/1/passages/JHN.3.16", json={"reference": "John 3:16"}
+def test_parse_reference_rejects_unknown_books() -> None:
+    with pytest.raises(BibleError, match="Unknown book"):
+        parse_reference("Hezekiah 1:1")
+    with pytest.raises(BibleError, match="Unexpected"):
+        parse_reference("John 3")
+
+
+def test_verse_text_skips_notes_and_joins_lines() -> None:
+    assert verse_text(BSB_PHP_4, 6, 7) == (
+        "Be anxious for nothing, but in everything, by prayer and petition, with "
+        "thanksgiving, present your requests to God. And the peace of God, will guard your hearts."
     )
-    with pytest.raises(YouVersionError):
-        await client.get_passage(1, "JHN.3.16")
+    with pytest.raises(BibleNotFoundError, match="Verse 8"):
+        verse_text(BSB_PHP_4, 7, 8)
 
 
-def test_bible_falls_back_to_unlocalized_fields() -> None:
-    """Bibles without localized fields or copyright still parse."""
-    bible = Bible.from_api({"id": "1", "abbreviation": "KJV", "title": "King James"})
-    assert bible == Bible(id=1, abbreviation="KJV", title="King James", copyright=None)
-    assert Bible.from_api(KJV).copyright is None
+def test_choosing_languages_and_translations() -> None:
+    translations = [Translation.from_api(t) for t in TRANSLATIONS["translations"]]
+    names = languages(translations)
+    assert list(names) == ["eng", "xyz", "deu", "tam"]
+    assert names["tam"] == "Tamil (தமிழ்)" and names["eng"] == "English"
+    assert [t.id for t in for_language(translations, "eng")] == ["BSB", "ENGWEBP"]
+    assert default_translation(translations, "deu").id == "deu_l12"
+    assert default_translation(translations, "none") is None
+    assert translations[0].label == "Berean Standard Bible (BSB)"
+
+
+def test_capitalised_book_names_are_softened() -> None:
+    from custom_components.youversion_votd.api import _book_name
+
+    assert _book_name("ISAÍAS") == "Isaías"
+    assert _book_name("1 SAMUEL") == "1 Samuel"
+    assert _book_name("ஏசாயா") == "ஏசாயா"

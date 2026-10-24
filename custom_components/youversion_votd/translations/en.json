@@ -2,44 +2,30 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to YouVersion",
-        "description": "Create a free app key at {platform_url}, then paste it below.",
+        "title": "Bible Verse of the Day",
+        "description": "DailyVerses.net picks a verse every day. Choose the language to read it in; no account or key is needed.",
         "data": {
-          "app_key": "App key",
           "language": "Language"
-        },
-        "data_description": {
-          "app_key": "The app key from your YouVersion Platform app.",
-          "language": "Language code used to list Bible versions, such as en, es or pt-BR."
         }
       },
-      "bible": {
-        "title": "Choose a Bible version",
+      "translation": {
+        "title": "Choose a Bible translation",
+        "description": "Translations come from the Free Use Bible API: public-domain and openly licensed texts.",
         "data": {
-          "bible_id": "Bible version"
+          "translation": "Translation"
         },
         "data_description": {
-          "bible_id": "Only versions your app key is licensed to read are listed."
-        }
-      },
-      "reauth_confirm": {
-        "title": "Update your YouVersion app key",
-        "description": "YouVersion rejected the saved app key. Enter a new one from {platform_url}.",
-        "data": {
-          "app_key": "App key"
+          "translation": "If a translation doesn't include the day's verse, it is shown in the Berean Standard Bible (English) instead."
         }
       }
     },
     "error": {
-      "invalid_auth": "YouVersion rejected this app key.",
-      "cannot_connect": "Could not reach the YouVersion API.",
-      "no_bibles": "This app key has no Bible versions in that language.",
-      "bible_unavailable": "This app key cannot read the configured Bible version.",
+      "cannot_connect": "Could not reach the Free Use Bible API. Try again later.",
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This Bible version is already set up.",
-      "reauth_successful": "The app key was updated."
+      "already_configured": "This translation is already set up.",
+      "reconfigure_successful": "The language and translation were updated."
     }
   },
   "entity": {
@@ -49,12 +35,13 @@
         "state_attributes": {
           "text": { "name": "Text" },
           "reference": { "name": "Reference" },
+          "reference_en": { "name": "Reference (English)" },
           "passage_id": { "name": "Passage ID" },
-          "version": { "name": "Version" },
-          "version_name": { "name": "Version name" },
-          "bible_id": { "name": "Bible ID" },
-          "copyright": { "name": "Copyright" },
-          "day_of_year": { "name": "Day of year" },
+          "translation": { "name": "Translation" },
+          "translation_name": { "name": "Translation name" },
+          "language": { "name": "Language" },
+          "license": { "name": "License" },
+          "fallback": { "name": "Shown in fallback translation" },
           "date": { "name": "Date" },
           "url": { "name": "URL" }
         }

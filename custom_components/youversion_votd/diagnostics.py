@@ -1,33 +1,29 @@
-"""Diagnostics for YouVersion Verse of the Day."""
+"""Diagnostics for Bible Verse of the Day."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_APP_KEY
-from .coordinator import YouVersionConfigEntry
-
-TO_REDACT = {CONF_APP_KEY}
+from .coordinator import BibleConfigEntry
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: YouVersionConfigEntry
+    hass: HomeAssistant, entry: BibleConfigEntry
 ) -> dict[str, Any]:
-    """Return diagnostics for a config entry, without the app key."""
+    """Return diagnostics for a config entry (it holds no secrets)."""
     verse = entry.runtime_data.data
     return {
-        "entry": async_redact_data(entry.as_dict(), TO_REDACT),
+        "entry": entry.as_dict(),
         "verse": None
         if verse is None
         else {
             "date": verse.date.isoformat(),
-            "day_of_year": verse.day_of_year,
-            "passage_id": verse.passage_id,
-            "reference": verse.reference,
-            "bible_id": verse.bible.id,
-            "version": verse.bible.abbreviation,
+            "reference_en": verse.daily.reference,
+            "passage_id": verse.daily.passage_id,
+            "reference": verse.passage.reference,
+            "translation": verse.translation.id,
+            "fallback": verse.fallback,
         },
     }

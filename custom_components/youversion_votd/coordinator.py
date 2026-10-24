@@ -1,52 +1,78 @@
-"""Coordinator that fetches the YouVersion Verse of the Day once per day."""
+"""Coordinator that fetches the verse of the day once per day."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import Bible, YouVersionAuthError, YouVersionClient, YouVersionError
-from .const import CONF_BIBLE_ID, DOMAIN, UPDATE_INTERVAL
+from .api import (
+    BibleClient,
+    BibleError,
+    BibleNotFoundError,
+    DailyVerse,
+    Passage,
+    Translation,
+)
+from .const import (
+    CONF_LANGUAGE,
+    CONF_LICENSE_URL,
+    CONF_SHORT_NAME,
+    CONF_TRANSLATION,
+    CONF_TRANSLATION_NAME,
+    DOMAIN,
+    FALLBACK_TRANSLATION,
+    UPDATE_INTERVAL,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-type YouVersionConfigEntry = ConfigEntry[YouVersionCoordinator]
+type BibleConfigEntry = ConfigEntry[BibleCoordinator]
+
+
+def translation_from(data: dict[str, Any]) -> Translation:
+    """The translation saved in a config entry."""
+    return Translation(
+        id=data[CONF_TRANSLATION],
+        name=data.get(CONF_TRANSLATION_NAME) or data[CONF_TRANSLATION],
+        short_name=data.get(CONF_SHORT_NAME) or data[CONF_TRANSLATION],
+        language=data.get(CONF_LANGUAGE) or "",
+        language_name="",
+        language_english_name="",
+        license_url=data.get(CONF_LICENSE_URL),
+        books=0,
+        verses=0,
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class VerseOfTheDay:
     """Today's verse, ready to display."""
 
-    date: date
-    day_of_year: int
-    passage_id: str
-    reference: str
-    text: str
-    bible: Bible
+    daily: DailyVerse
+    passage: Passage
+    translation: Translation
+    fallback: bool
 
     @property
-    def url(self) -> str:
-        """Link to the passage on bible.com."""
-        return f"https://www.bible.com/bible/{self.bible.id}/{self.passage_id}"
+    def date(self) -> date:
+        """The DailyVerses.net date of the verse."""
+        return self.daily.date
 
 
-class YouVersionCoordinator(DataUpdateCoordinator[VerseOfTheDay]):
+class BibleCoordinator(DataUpdateCoordinator[VerseOfTheDay]):
     """Fetches the verse when the local date changes and serves it from memory otherwise."""
 
-    config_entry: YouVersionConfigEntry
+    config_entry: BibleConfigEntry
 
     def __init__(
-        self,
-        hass: HomeAssistant,
-        entry: YouVersionConfigEntry,
-        client: YouVersionClient,
+        self, hass: HomeAssistant, entry: BibleConfigEntry, client: BibleClient
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -58,31 +84,43 @@ class YouVersionCoordinator(DataUpdateCoordinator[VerseOfTheDay]):
             always_update=False,
         )
         self.client = client
-        self.bible_id: int = entry.data[CONF_BIBLE_ID]
-        self._bible: Bible | None = None
+        self.translation = translation_from(dict(entry.data))
+        self._book_names: dict[str, dict[str, str]] = {}
+
+    async def _names(self, translation: str) -> dict[str, str]:
+        if translation not in self._book_names:
+            self._book_names[translation] = await self.client.get_book_names(
+                translation
+            )
+        return self._book_names[translation]
 
     async def _async_update_data(self) -> VerseOfTheDay:
+        # DailyVerses.net follows European time, so its date can be a little behind
+        # or ahead of the local one; ask again only once the local date passes it.
         today = dt_util.now().date()
-        if self.data is not None and self.data.date == today:
+        if self.data is not None and self.data.date >= today:
             return self.data
-
-        # Same day numbering as YouVersion's SDKs: Jan 1 is day 1, in local time.
-        day = today.timetuple().tm_yday
         try:
-            passage_id = await self.client.get_verse_of_the_day(day)
-            passage = await self.client.get_passage(self.bible_id, passage_id)
-            if self._bible is None:
-                self._bible = await self.client.get_bible(self.bible_id)
-        except YouVersionAuthError as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
-        except YouVersionError as err:
+            daily = await self.client.get_daily_verse()
+            if self.data is not None and self.data.daily == daily:
+                return self.data
+            try:
+                passage = await self.client.get_passage(
+                    self.translation, daily, await self._names(self.translation.id)
+                )
+                translation, fallback = self.translation, False
+            except BibleNotFoundError:
+                translation = translation_from(FALLBACK_TRANSLATION)
+                _LOGGER.info(
+                    "%s is not in %s; showing it in %s",
+                    daily.reference,
+                    self.translation.id,
+                    translation.id,
+                )
+                passage = await self.client.get_passage(
+                    translation, daily, await self._names(translation.id)
+                )
+                fallback = True
+        except BibleError as err:
             raise UpdateFailed(str(err)) from err
-
-        return VerseOfTheDay(
-            date=today,
-            day_of_year=day,
-            passage_id=passage_id,
-            reference=passage.reference,
-            text=passage.text,
-            bible=self._bible,
-        )
+        return VerseOfTheDay(daily, passage, translation, fallback)
